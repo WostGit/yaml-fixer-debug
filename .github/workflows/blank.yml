@@ -67,24 +67,29 @@ jobs:
               messages = [{"role": "user", "content": prompt}]
               formatted = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
               
-              # Fixed: Changed 'temp' to 'temp' (the library expects 'temp', but let's ensure it's handled)
-              # If 'temp' still fails, the version of mlx_lm might use 'temp' or requires it in sampler_config.
+              # Removed 'temp' to fix the TypeError in mlx_lm 0.21.0
               output = generate(
                   model, 
                   tokenizer, 
                   prompt=formatted, 
                   max_tokens=2048, 
-                  temp=0.7, 
                   verbose=False
               )
               
               try:
-                  result = json.loads(output.strip())
+                  # Basic sanitization in case the model returns markdown code blocks
+                  clean_output = output.strip()
+                  if clean_output.startswith("```json"):
+                      clean_output = clean_output.split("```json")[1].split("```")[0].strip()
+                  elif clean_output.startswith("```"):
+                      clean_output = clean_output.split("```")[1].split("```")[0].strip()
+                      
+                  result = json.loads(clean_output)
                   with open(f"poc_{scenario['name']}.js", "w") as f:
                       f.write(result.get("poc_js", "// Failed generation"))
                   return f"Generated for {scenario['name']}"
               except Exception as e:
-                  return f"Generation failed for {scenario['name']}: {str(e)}"
+                  return f"Generation failed for {scenario['name']}: {str(e)}\nRaw Output: {output[:100]}"
 
           for scenario in scenarios:
               print(f"\n=== Running scenario: {scenario['name']} ===")
