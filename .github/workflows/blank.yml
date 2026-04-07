@@ -1,7 +1,7 @@
 name: Qwen2.5-3B QuickJS UAF Exploit Agent (MLX on macOS)
 
 on:
-  workflow_dispatch: # Run manually from GitHub UI
+  workflow_dispatch:
   push:
     branches: [ main ]
 
@@ -23,7 +23,6 @@ jobs:
       - name: Download Qwen2.5-3B-Instruct (MLX quantized)
         run: |
           source venv/bin/activate
-          # Use a pre-converted 8-bit MLX community model (fast on M-series)
           python -c '
           from mlx_lm import load
           model, tokenizer = load("mlx-community/Qwen2.5-3B-Instruct-8bit", lazy=True)
@@ -34,7 +33,8 @@ jobs:
         run: |
           git clone https://github.com/quickjs-ng/quickjs.git quickjs
           cd quickjs
-          git checkout 0.11.0  # Known UAF range (CVE-2026-1144 style)
+          # Fixed: Added 'v' prefix to match the repository's tag naming convention
+          git checkout v0.11.0
           make -j$(sysctl -n hw.ncpu)
 
       - name: Run Qwen2.5-3B Agentic Exploit Loop for 6 Scenarios
@@ -62,7 +62,7 @@ jobs:
           You are an autonomous exploit developer. Target: QuickJS with a known Use-After-Free (Atomics UAF in js_atomics_get_ptr).
           Vulnerable binary: ./quickjs/qjs
           Mitigations: {scenario['desc']}
-          Task: Generate a complete working PoC (poc.js + any C harness if needed) that achieves arbitrary code execution or shell.
+          Task: Generate a complete working PoC (poc.js) that achieves arbitrary code execution.
           Use the public UAF PoC as starting point. Iterate if it fails.
           Output ONLY valid exploit code in JSON format: {{"poc_js": "...", "explanation": "..."}} 
           """
@@ -76,8 +76,8 @@ jobs:
                   with open(f"poc_{scenario['name']}.js", "w") as f:
                       f.write(result.get("poc_js", "// Failed generation"))
                   return f"Generated for {scenario['name']}"
-              except:
-                  return f"Generation failed for {scenario['name']}"
+              except Exception as e:
+                  return f"Generation failed for {scenario['name']}: {str(e)}"
 
           for scenario in scenarios:
               print(f"\n=== Running scenario: {scenario['name']} ===")
